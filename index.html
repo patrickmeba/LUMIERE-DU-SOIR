@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1f3a5f">
+<title>Lecture</title>
+<style>
+:root{--bg:#faf8f3;--fg:#222;--card:#fff;--ac:#1f3a5f;--mut:#777;--bd:#e2ddd0;--fs:18px;--ff:Georgia,serif;--lh:1.6}
+@media(prefers-color-scheme:dark){:root{--bg:#15181d;--fg:#e8e6e1;--card:#1f242b;--ac:#7fa8d9;--mut:#9aa;--bd:#333a44}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;padding-bottom:70px}
+header{position:sticky;top:0;background:var(--ac);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+@media(prefers-color-scheme:dark){header{color:#111}}
+header b{font-size:18px}header span button{background:none;border:1px solid currentColor;color:inherit;border-radius:6px;padding:2px 9px;margin-left:6px}
+main{padding:14px 3vw;max-width:none}#fp{display:none;position:sticky;top:48px;z-index:4;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 3vw}#fp.on{display:block}#fp label{display:block;margin:6px 0 2px;font-size:13px;color:var(--mut)}#fp input[type=range]{width:100%}.hq{flex:1;min-width:0;margin:0 10px;padding:7px 10px;border-radius:8px;border:0;font-size:15px;color:#222}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.grid img,.cv{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:var(--bd)}.cvs{width:56px;height:74px;object-fit:cover;border-radius:6px;float:left;margin-right:12px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd)}
+nav button{flex:1;padding:12px 2px;border:0;background:none;color:var(--mut);font-size:12px}nav button.on{color:var(--ac);font-weight:700}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.big{font-size:22px;font-weight:700;margin:6px 0}.mut{color:var(--mut);font-size:14px}
+button.b,select,input[type=text],input[type=search]{padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font-size:15px}
+button.b{background:var(--ac);color:#fff;border:0;margin:3px 3px 3px 0}
+@media(prefers-color-scheme:dark){button.b{color:#111}}
+button.g{background:none;color:var(--ac);border:1px solid var(--ac)}
+select,input[type=text],input[type=search]{width:100%;margin-bottom:8px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.txt{font-size:var(--fs);line-height:var(--lh);font-family:var(--ff);white-space:pre-wrap}
+.v{display:block;margin-bottom:6px}.v i{color:var(--ac);font-size:.7em;vertical-align:super;margin-right:3px}
+.it{padding:12px;border-bottom:1px solid var(--bd);cursor:pointer}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 14px;border-radius:20px;display:none}
+</style></head><body>
+<header><b id="ttl">Lecture</b><input type="search" class="hq" id="hq" placeholder="Rechercher…" oninput="sq(this.value)"><span><button onclick="fs(-2)">A−</button><button onclick="fs(2)">A+</button><button onclick="$('#fp').classList.toggle('on')">Aa</button></span></header><div id="fp"><label>Police</label><select id="ff" onchange="st('ff',this.value)"><option value="Georgia,serif">Georgia</option><option value="'Palatino Linotype',Palatino,serif">Palatino</option><option value="'Times New Roman',serif">Times</option><option value="system-ui,sans-serif">Système</option><option value="Arial,sans-serif">Arial</option><option value="Verdana,sans-serif">Verdana</option></select><label>Taille du texte <span id="fv"></span></label><input type="range" min="14" max="44" id="fz" oninput="st('fs',this.value)"><label>Interligne</label><input type="range" min="12" max="24" id="lh" oninput="st('lh',this.value/10)"></div>
+<main id="m"></main>
+<nav id="nv"></nav><div id="toast"></div><input type="file" id="fi" multiple hidden>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const DB=()=>new Promise((r,j)=>{const q=indexedDB.open('lecture',1);q.onupgradeneeded=()=>q.result.createObjectStore('d',{keyPath:'id'});q.onsuccess=()=>r(q.result);q.onerror=j});
+async function tx(m,f){const db=await DB();return new Promise((r,j)=>{const t=db.transaction('d',m);const q=f(t.objectStore('d'));t.oncomplete=()=>r(q&&q.result);t.onerror=j})}
+const all=()=>tx('readonly',s=>s.getAll()),put=d=>tx('readwrite',s=>s.put(d)),del=id=>tx('readwrite',s=>s.delete(id));
+const DEF=[{t:'La confiance',v:'Proverbes 3:5-6'},{t:'La paix',v:'Jean 14:27'},{t:'L’espérance',v:'Romains 15:13'},{t:'La prière',v:'Philippiens 4:6'},{t:'L’amour',v:'1 Corinthiens 13'},{t:'La foi',v:'Hébreux 11:1'},{t:'La reconnaissance',v:'Psaume 100'}];
+const TABS=[['today','Aujourd’hui'],['bible','Bible'],['brochure','Brochures'],['chant','Chants'],['photo','Photos'],['set','Réglages']];
+let S={tab:'today',docs:[],themes:DEF,doc:null,b:0,c:0,sec:null,q:''};
+const R=document.documentElement.style;
+function st(k,v){LS(k,v);if(k==='ff')R.setProperty('--ff',v);if(k==='fs')R.setProperty('--fs',v+'px');if(k==='lh')R.setProperty('--lh',v);$('#fz').value=LS('fs')||18;$('#lh').value=(LS('lh')||1.6)*10;$('#ff').value=LS('ff')||'Georgia,serif';$('#fv').textContent=(LS('fs')||18)+' px'}
+function fs(d){st('fs',Math.max(14,Math.min(44,+(LS('fs')||18)+d)))}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2500)}
+async function load(){const a=await all();S.docs=a.filter(d=>d.type);const t=a.find(d=>d.id==='themes');if(t&&t.list.length)S.themes=t.list;render()}
+function go(t){S.tab=t;S.doc=null;S.sec=null;S.q='';$('#hq').value='';render()}
+async function zip(buf){const v=new DataView(buf),u=new Uint8Array(buf);let e=u.length-22;while(e>=0&&v.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw 0;
+ const n=v.getUint16(e+10,true);let p=v.getUint32(e+16,true);const o={};
+ for(let i=0;i<n;i++){const nl=v.getUint16(p+28,true),xl=v.getUint16(p+30,true),cl=v.getUint16(p+32,true);o[new TextDecoder().decode(u.subarray(p+46,p+46+nl))]={m:v.getUint16(p+10,true),cs:v.getUint32(p+20,true),lo:v.getUint32(p+42,true)};p+=46+nl+xl+cl}
+ return{o,get:async k=>{const f=o[k],q=f.lo+30+v.getUint16(f.lo+26,true)+v.getUint16(f.lo+28,true),d=u.subarray(q,q+f.cs);
+  if(f.m===0)return new TextDecoder().decode(d);
+  return await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text()}}}
+async function pptx(f,type){if(type==='bible')throw 0;const z=await zip(await f.arrayBuffer());
+ const ks=Object.keys(z.o).filter(k=>/^ppt\/slides\/slide\d+\.xml$/.test(k)).sort((a,b)=>a.match(/\d+/)[0]-b.match(/\d+/)[0]),sections=[];
+ for(const k of ks){const x=await z.get(k),ps=[...x.matchAll(/<a:p[ >][\s\S]*?<\/a:p>/g)].map(m=>[...m[0].matchAll(/<a:t(?: [^>]*)?>([\s\S]*?)<\/a:t>/g)].map(t=>t[1]).join('').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&')).filter(s=>s.trim());
+  if(ps.length)sections.push(ps.length>1?{t:ps[0],b:ps.slice(1).join('\n')}:{t:'Diapo '+(sections.length+1),b:ps[0]})}
+ if(!sections.length)throw 0;
+ return{id:'d'+Date.now()+Math.random().toString(36).slice(2,6),type,title:f.name.replace(/\.\w+$/,''),sections}}
+function parse(name,txt,type){
+ let j;try{j=JSON.parse(txt)}catch(e){}
+ const id='d'+Date.now()+Math.random().toString(36).slice(2,6),title=name.replace(/\.\w+$/,'');
+ if(j){if(j.books)return{id,type:'bible',title:j.title||title,books:j.books};
+  return{id,type,title:j.title||title,sections:j.sections||[{t:title,b:String(j.text||'')}]}}
+ if(type==='bible'){const bk=[];txt.split(/\r?\n/).forEach(l=>{l=l.trim();if(!l)return;
+  if(l.startsWith('## ')){bk.length&&bk[bk.length-1].c.push([])}
+  else if(l.startsWith('# '))bk.push({n:l.slice(2),c:[]});
+  else{const b=bk[bk.length-1];if(!b)return;if(!b.c.length)b.c.push([]);b.c[b.c.length-1].push(l)}});
+  return{id,type,title,books:bk}}
+ let sections=[{t:title,b:txt}];
+ if(/^# /m.test(txt))sections=txt.split(/^# /m).filter(x=>x.trim()).map(x=>{const i=x.indexOf('\n');return i<0?{t:x.trim(),b:''}:{t:x.slice(0,i).trim(),b:x.slice(i+1).trim()}});
+ return{id,type,title,sections}}
+const CDN='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+async function pdf(f,type){if(type==='bible')throw 0;if(!window.pdfjsLib)await new Promise((r,j)=>{const s=document.createElement('script');s.src=CDN+'pdf.min.js';s.onload=r;s.onerror=j;document.head.appendChild(s)});
+ pdfjsLib.GlobalWorkerOptions.workerSrc=CDN+'pdf.worker.min.js';
+ const p=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,sections=[];
+ for(let i=1;i<=p.numPages;i++){const t=await(await p.getPage(i)).getTextContent(),b=t.items.map(x=>x.str+(x.hasEOL?'\n':'')).join('').trim();if(b)sections.push({t:'Page '+i,b})}
+ if(!sections.length)throw 0;
+ return{id:'d'+Date.now()+Math.random().toString(36).slice(2,6),type,title:f.name.replace(/\.\w+$/,''),sections}}
+function imp(type){const f=$('#fi');f.accept=type==='bible'?'.txt,.json,.md':'.txt,.json,.md,.pptx,.pdf';f.onchange=async()=>{toast('Import en cours…');for(const x of f.files){try{await put(/\.pptx$/i.test(x.name)?await pptx(x,type):/\.pdf$/i.test(x.name)?await pdf(x,type):parse(x.name,await x.text(),type))}catch(e){toast('Erreur: '+x.name+' (PDF : texte introuvable ou connexion requise la 1re fois)')}}f.value='';toast('Importé');load()};f.click()}
+function dl(n,t,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click()}
+function toTxt(d){return d.books?d.books.map(b=>'# '+b.n+'\n'+b.c.map((c,i)=>'## '+(i+1)+'\n'+c.join('\n')).join('\n')).join('\n'):d.sections.map(s=>'# '+s.t+'\n'+s.b).join('\n\n')}
+function exp(id,f){const d=S.docs.find(x=>x.id===id);f==='json'?dl(d.title+'.json',JSON.stringify(d),'application/json'):dl(d.title+'.txt',toTxt(d),'text/plain')}
+function bak(){dl('sauvegarde.json',JSON.stringify(S.docs),'application/json')}
+async function rm(id){if(confirm('Supprimer ?')){await del(id);S.doc=null;load()}}
+async function sync(manual){const u=LS('url');if(!u||!navigator.onLine){manual&&toast('Hors ligne ou URL vide');return}
+ try{const m=await(await fetch(u,{cache:'no-store'})).json();let n=0;
+  if(m.themes){await put({id:'themes',list:m.themes});n++}
+  for(const x of m.docs||[]){const old=S.docs.find(d=>d.rid===x.id);if(old&&old.ver===x.version)continue;
+   const t=await(await fetch(new URL(x.url,u),{cache:'no-store'})).text();
+   const d=parse(x.title||x.id,t,x.type);d.rid=x.id;d.ver=x.version;if(old)d.id=old.id;await put(d);n++}
+  await load();manual&&toast(n?'Mis à jour':'Déjà à jour')}catch(e){manual&&toast('Échec de la mise à jour')}}
+let t0;function sq(v){clearTimeout(t0);t0=setTimeout(()=>{S.q=v;if(S.sec!==null&&S.tab!=='bible')S.sec=null;render()},250)}
+function img(f,w){return new Promise(r=>{const i=new Image();i.onload=()=>{const k=Math.min(1,w/i.width),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.8))};i.src=URL.createObjectURL(f)})}
+function cover(id){const f=$('#fi');f.accept='image/*';f.onchange=async()=>{const d=S.docs.find(x=>x.id===id);d.img=await img(f.files[0],400);await put(d);f.value='';load()};f.click()}
+function addph(){const f=$('#fi');f.accept='image/*';f.onchange=async()=>{for(const x of f.files)await put({id:'p'+Date.now()+Math.random().toString(36).slice(2,5),type:'photo',title:x.name,img:await img(x,1200)});f.value='';load()};f.click()}
+function photos(m){const ps=S.docs.filter(d=>d.type==='photo'),p=ps.find(x=>x.id===S.doc);
+ if(p){m.innerHTML=`<button class="b g" onclick="S.doc=null;render()">← Retour</button><button class="b g" onclick="rm('${p.id}')">Supprimer</button><img src="${p.img}" style="width:100%;margin-top:10px;border-radius:8px">`;return}
+ m.innerHTML=`<button class="b" onclick="addph()">+ Ajouter des photos</button><div class="grid" style="margin-top:12px">${ps.map(x=>`<img src="${x.img}" onclick="S.doc='${x.id}';render()">`).join('')||'<div class="mut">Votre poche à photos est vide.</div>'}</div>`}
+function pick(id){S.doc=id;S.b=0;S.c=0;S.sec=null;S.q='';render()}
+function render(){
+ $('#nv').innerHTML=TABS.map(([k,l])=>`<button class="${S.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('');
+ $('#ttl').textContent=TABS.find(t=>t[0]===S.tab)[1];
+ const m=$('#m');if($('#hq').value!==S.q)$('#hq').value=S.q;
+ if(S.tab==='today'){const n=Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5),t=S.themes[n%S.themes.length];
+  m.innerHTML=`<div class="card"><div class="mut">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div><div class="mut">Thème du jour</div><div class="big">${esc(t.t)}</div><div>${esc(t.v||'')}</div></div><div class="card mut">${S.docs.length} document(s) disponible(s) hors ligne.</div>`}
+ else if(S.tab==='bible')bible(m);else if(S.tab==='photo')photos(m);
+ else if(S.tab==='set')m.innerHTML=`<div class="card"><b>Mise à jour automatique</b><p class="mut">Adresse d’un fichier JSON (thèmes, Bible, brochures, chants). Vérifiée à chaque ouverture si vous êtes en ligne.</p><input type="text" id="u" placeholder="https://…/maj.json" value="${esc(LS('url')||'')}"><button class="b" onclick="LS('url',$('#u').value.trim());sync(1)">Enregistrer et mettre à jour</button></div><div class="card"><b>Sauvegarde</b><br><button class="b" onclick="bak()">Exporter tout</button></div>`;
+ else lst(m,S.tab)}
+function acts(d){return`<div style="margin-top:10px"><button class="b g" onclick="cover('${d.id}')">📷 Photo</button><button class="b g" onclick="exp('${d.id}','txt')">Exporter .txt</button><button class="b g" onclick="exp('${d.id}','json')">Exporter .json</button><button class="b g" onclick="rm('${d.id}')">Supprimer</button></div>`}
+function bible(m){const bs=S.docs.filter(d=>d.type==='bible');
+ if(!bs.length){m.innerHTML=`<div class="card">Aucune Bible. Importez un fichier .json ou .txt.<br><br><button class="b" onclick="imp('bible')">Importer une Bible</button></div>`;return}
+ const d=bs.find(x=>x.id===S.doc)||bs[0];S.doc=d.id;const bk=d.books[S.b]||d.books[0],ch=bk.c[S.c]||[];
+ let h=`${d.img?`<img class="cvs" src="${d.img}" style="float:none;margin:0 0 8px">`:''}<select onchange="pick(this.value)">${bs.map(x=>`<option value="${x.id}" ${x.id===d.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select>
+ <div class="row"><select onchange="S.b=+this.value;S.c=0;render()">${d.books.map((b,i)=>`<option value="${i}" ${i===S.b?'selected':''}>${esc(b.n)}</option>`).join('')}</select>
+ <select onchange="S.c=+this.value;render()">${bk.c.map((_,i)=>`<option value="${i}" ${i===S.c?'selected':''}>Chap. ${i+1}</option>`).join('')}</select></div>
+ `;
+ if(S.q){const q=S.q.toLowerCase(),r=[];d.books.forEach((b,i)=>b.c.forEach((c,j)=>c.forEach((v,k)=>{if(r.length<60&&v.toLowerCase().includes(q))r.push(`<div class="it" onclick="S.b=${i};S.c=${j};S.q='';render()"><b>${esc(b.n)} ${j+1}:${k+1}</b><div class="mut">${esc(v)}</div></div>`)})));h+=r.join('')||'<div class="mut">Aucun résultat.</div>'}
+ else h+=`<div class="txt card">${ch.map((v,i)=>`<span class="v"><i>${i+1}</i>${esc(v)}</span>`).join('')}</div>
+ <div class="row"><button class="b" onclick="nav(-1)">← Précédent</button><button class="b" onclick="nav(1)">Suivant →</button></div><button class="b g" onclick="imp('bible')">Importer une Bible</button>`+acts(d);
+ m.innerHTML=h}
+function nav(s){const d=S.docs.find(x=>x.id===S.doc);let b=S.b,c=S.c+s;
+ if(c<0){b--;if(b<0)return;c=d.books[b].c.length-1}else if(c>=d.books[b].c.length){b++;if(b>=d.books.length)return;c=0}
+ S.b=b;S.c=c;render();scrollTo(0,0)}
+function lst(m,type){const ds=S.docs.filter(d=>d.type===type),lab=type==='chant'?'recueil de chants':'brochure';
+ const d=ds.find(x=>x.id===S.doc);
+ if(!d&&S.q){const q=S.q.toLowerCase(),r=[];ds.forEach(x=>x.sections.forEach((s,i)=>{if(r.length<80&&(s.t+s.b).toLowerCase().includes(q))r.push(`<div class="it" onclick="S.doc='${x.id}';S.sec=${i};render()"><b>${esc(s.t)}</b><div class="mut">${esc(x.title)}</div></div>`)}));m.innerHTML=r.join('')||'<div class="mut">Aucun résultat.</div>';return}
+ if(!d){m.innerHTML=(ds.length?ds.map(x=>`<div class="it card" onclick="pick('${x.id}')">${x.img?`<img class="cvs" src="${x.img}">`:''}<b>${esc(x.title)}</b><div class="mut">${x.sections.length} section(s)</div></div>`).join(''):`<div class="card mut">Aucun ${lab}.</div>`)+`<button class="b" onclick="imp('${type}')">Importer ${type==='chant'?'un recueil':'une brochure'}</button><p class="mut">PowerPoint (.pptx) : une diapo = une section. PDF : une page = une section. Format texte : un titre par ligne commençant par « # ». JSON : {"title":"…","sections":[{"t":"…","b":"…"}]}.</p>`;return}
+ if(S.sec!==null){const s=d.sections[S.sec];m.innerHTML=`<button class="b g" onclick="S.sec=null;render()">← ${esc(d.title)}</button><div class="card"><div class="big">${esc(s.t)}</div><div class="txt">${esc(s.b)}</div></div><div class="row"><button class="b" onclick="S.sec=Math.max(0,S.sec-1);render();scrollTo(0,0)">←</button><button class="b" onclick="S.sec=Math.min(${d.sections.length-1},S.sec+1);render();scrollTo(0,0)">→</button></div>`;return}
+ const q=S.q.toLowerCase();
+ m.innerHTML=`<button class="b g" onclick="S.doc=null;render()">← Retour</button>${d.img?`<img class="cv" src="${d.img}" style="max-width:160px">`:''}<div class="big">${esc(d.title)}</div>`+
+ d.sections.map((s,i)=>(!q||(s.t+s.b).toLowerCase().includes(q))?`<div class="it" onclick="S.sec=${i};render()">${esc(s.t)}</div>`:'').join('')+acts(d)}
+st('fs',LS('fs')||18);st('lh',LS('lh')||1.6);st('ff',LS('ff')||'Georgia,serif');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+addEventListener('online',()=>sync());
+load().then(()=>sync());
+</script></body></html>
